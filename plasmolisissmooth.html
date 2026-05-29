@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Simulasi Plasmolisis - Final</title>
+
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #eef7ff;
+}
+
+.viewer {
+    width: 380px;
+    height: 380px;
+    margin: 20px auto;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 8px solid #888;
+    background: radial-gradient(circle, #ffffff 60%, #dbeeff);
+}
+
+#canvas {
+    transform-origin: center;
+    transition: transform 0.5s;
+}
+
+.cell-wall {
+    fill: none;
+    stroke: #2e7d32;
+    stroke-width: 2.5;
+}
+
+.cytoplasm {
+    fill: url(#cytoGrad);
+    opacity: 0.95;
+    transition: all 0.5s;
+    stroke: rgba(0,0,0,0.2);
+}
+
+.vacuole {
+    fill: #e1bee7;
+    opacity: 0.8;
+    transition: all 0.5s;
+}
+
+/* AIR */
+.water {
+    fill: #03a9f4;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 4px #03a9f4);
+}
+
+/* MASUK */
+@keyframes flowIn {
+    0%   { transform: translate(var(--dx), var(--dy)) scale(0.5); opacity:0;}
+    100% { transform: translate(0,0) scale(1); opacity:1;}
+}
+
+/* KELUAR */
+@keyframes flowOut {
+    0%   { transform: translate(0,0) scale(1); opacity:1;}
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.5); opacity:0;}
+}
+</style>
+</head>
+
+<body>
+
+<h2>Simulasi Plasmolisis</h2>
+
+<p>Kadar gula: <span id="value">0</span>%</p>
+<input type="range" min="0" max="10" step="0.5" value="0" id="slider">
+
+<div class="viewer">
+<svg id="canvas" viewBox="0 0 520 520">
+
+<defs>
+<radialGradient id="cytoGrad">
+<stop offset="0%" stop-color="#ce93d8"/>
+<stop offset="100%" stop-color="#6a1b9a"/>
+</radialGradient>
+</defs>
+
+<g id="cells"></g>
+<g id="waterLayer"></g>
+
+</svg>
+</div>
+
+<p id="status"></p>
+
+<script>
+const slider = document.getElementById("slider");
+const valueText = document.getElementById("value");
+const status = document.getElementById("status");
+const cellsGroup = document.getElementById("cells");
+const waterLayer = document.getElementById("waterLayer");
+const canvas = document.getElementById("canvas");
+
+let cells = [];
+
+/* ===== BUAT SEL ===== */
+for (let r=0; r<4; r++){
+for (let c=0; c<4; c++){
+
+let x = c*110 + 30;
+let y = r*110 + 30;
+
+let wall = document.createElementNS("http://www.w3.org/2000/svg","path");
+wall.setAttribute("class","cell-wall");
+wall.setAttribute("d",
+`M${x},${y}
+Q${x+50},${y-10} ${x+100},${y}
+Q${x+110},${y+50} ${x+100},${y+100}
+Q${x+50},${y+110} ${x},${y+100}
+Q${x-10},${y+50} ${x},${y} Z`);
+
+let cyto = document.createElementNS("http://www.w3.org/2000/svg","path");
+cyto.setAttribute("class","cytoplasm");
+
+let vac = document.createElementNS("http://www.w3.org/2000/svg","path");
+vac.setAttribute("class","vacuole");
+
+cellsGroup.appendChild(wall);
+cellsGroup.appendChild(cyto);
+cellsGroup.appendChild(vac);
+
+let seed = Math.random()*5;
+
+cells.push({cyto,vac,x,y,seed});
+
+}}
+
+/* ===== SHAPE ===== */
+function shape(v,x,y,seed){
+let shrink = v*3 + seed;
+let gap = v*2;
+
+return `M${x+10+shrink+gap},${y+10+shrink+gap}
+Q${x+50},${y+gap} ${x+90-shrink-gap},${y+10+shrink}
+Q${x+100-shrink-gap},${y+50} ${x+90-shrink-gap},${y+90-shrink-gap}
+Q${x+50},${y+100-shrink-gap} ${x+10+shrink+gap},${y+90-shrink-gap}
+Q${x+gap},${y+50} ${x+10+shrink+gap},${y+10+shrink+gap} Z`;
+}
+
+function vacShape(v,x,y){
+let shrink = v*5;
+
+return `M${x+25+shrink},${y+25+shrink}
+Q${x+50},${y+20+shrink} ${x+75-shrink},${y+30+shrink}
+Q${x+80-shrink},${y+50} ${x+70-shrink},${y+75-shrink}
+Q${x+50},${y+80-shrink} ${x+25+shrink},${y+70-shrink}
+Q${x+20+shrink},${y+50} ${x+25+shrink},${y+25+shrink} Z`;
+}
+
+/* ===== AIR ===== */
+function water(v){
+waterLayer.innerHTML="";
+
+cells.forEach(cell=>{
+
+let jumlah = Math.floor(1 + v/2);
+
+for(let i=0;i<jumlah;i++){
+
+let c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+
+c.setAttribute("cx",cell.x+50+(Math.random()*40-20));
+c.setAttribute("cy",cell.y+50+(Math.random()*40-20));
+c.setAttribute("r", 3 + v*0.3);
+c.setAttribute("class","water");
+
+/* LOGIKA ARAH */
+if(v == 0){
+    let angle = Math.random()*360;
+    let dist = 30 + Math.random()*20;
+
+    c.style.setProperty('--dx', Math.cos(angle*Math.PI/180)*dist + "px");
+    c.style.setProperty('--dy', Math.sin(angle*Math.PI/180)*dist + "px");
+
+    c.style.animation = "flowIn 1.2s linear infinite";
+}
+
+else if(v <= 1){
+    c.style.animation = "flowIn 1.5s linear infinite";
+    c.style.opacity = "0.5";
+}
+else{
+    let angle = Math.random()*360;
+    let dist = 30 + Math.random()*20;
+
+    c.style.setProperty('--dx', Math.cos(angle*Math.PI/180)*dist + "px");
+    c.style.setProperty('--dy', Math.sin(angle*Math.PI/180)*dist + "px");
+
+    c.style.animation = "flowOut 1.2s linear infinite";
+}
+
+waterLayer.appendChild(c);
+}
+
+});
+}
+
+/* ===== UPDATE ===== */
+function update(v){
+valueText.textContent=v;
+
+cells.forEach(c=>{
+c.cyto.setAttribute("d",shape(v,c.x,c.y,c.seed));
+c.vac.setAttribute("d",vacShape(v,c.x,c.y));
+});
+
+water(v);
+
+canvas.style.transform=`scale(${1+v*0.03})`;
+
+if(v==0)
+status.innerHTML="<b>Turgid</b><br>Air masuk (hipotonik)";
+else if(v<=1)
+status.innerHTML="<b>Isotonik</b><br>Seimbang";
+else if(v<=5)
+status.innerHTML="<b>Plasmolisis awal</b><br>Air keluar";
+else
+status.innerHTML="<b>Plasmolisis sempurna</b>";
+}
+
+slider.addEventListener("input",()=>update(parseFloat(slider.value)));
+update(0);
+</script>
+
+</body>
+</html>
